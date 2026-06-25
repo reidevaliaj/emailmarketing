@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import math
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 
 from app.celery_app import celery_app
 from app.config import settings
@@ -38,6 +38,7 @@ from app.models.enums import (
     RecipientStatus,
 )
 from app.models.template import Template
+from app.services.counters import bump_campaign as _bump
 from app.services.merge import build_context, render
 from app.services.normalize import domain_of
 from app.services.rate_limit import (
@@ -56,14 +57,6 @@ _TERMINAL_VALUES = [s.value for s in TERMINAL_RECIPIENT_STATUSES]
 
 
 # --- counter helpers -------------------------------------------------------
-
-def _bump(session, campaign_id: int, **deltas: int) -> None:
-    """Atomic counter increments so concurrent workers don't clobber each other."""
-    if not deltas:
-        return
-    values = {k: getattr(Campaign, k) + v for k, v in deltas.items()}
-    session.execute(update(Campaign).where(Campaign.id == campaign_id).values(**values))
-
 
 def _pending_count(session, campaign_id: int) -> int:
     return session.scalar(
