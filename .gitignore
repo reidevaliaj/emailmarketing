@@ -1,14 +1,42 @@
+# ---- Secrets / credentials (NEVER commit) ----
 .env
 *.env
+!.env.example
 *.pem
 *.key
 id_ed25519*
+id_rsa*
 .git-credentials
+secrets/
+
+# ---- Python ----
 __pycache__/
-*.pyc
-venv/
+*.py[cod]
+*.egg-info/
+.eggs/
 .venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Node / frontend build artifacts ----
 node_modules/
 dist/
 build/
+
+# ---- Runtime / data ----
 *.log
+*.sqlite3
+*.db
+uploads/
+postgres-data/
+redis-data/
+
+# ---- Editor / OS ----
+.idea/
+.vscode/
+.DS_Store

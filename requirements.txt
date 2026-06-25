@@ -1,0 +1,35 @@
+# ---- Web / API ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+gunicorn==23.0.0
+python-multipart==0.0.20
+jinja2==3.1.5
+itsdangerous==2.2.0
+
+# ---- Validation / settings ----
+pydantic==2.10.5
+pydantic-settings==2.7.1
+email-validator==2.2.0
+
+# ---- Database ----
+sqlalchemy[asyncio]==2.0.37
+alembic==1.14.1
+asyncpg==0.30.0          # async driver used by FastAPI
+psycopg[binary]==3.2.4   # sync driver used by Celery workers
+
+# ---- Queue / worker / cache ----
+celery[redis]==5.4.0
+redis==5.2.1
+
+# ---- Security ----
+argon2-cffi==23.1.0
+
+# ---- Integrations / IO ----
+httpx==0.28.1            # Postal HTTP API client
+dnspython==2.7.0         # MX / domain verification
+
+# ---- Tests ----
+pytest==8.3.4
+pytest-asyncio==0.25.2
+aiosqlite==0.20.0        # portable async DB for tests
+fakeredis==2.26.2        # in-memory Redis for rate-limiter tests
