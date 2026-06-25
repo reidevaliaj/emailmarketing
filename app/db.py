@@ -41,7 +41,7 @@ async_engine = create_async_engine(
 AsyncSessionLocal = async_sessionmaker(
     bind=async_engine,
     expire_on_commit=False,
-    autoflush=False,
+    autoflush=True,  # queries flush pending changes first (avoids stale-count bugs)
 )
 
 
@@ -72,7 +72,7 @@ sync_engine = create_engine(
 SyncSessionLocal = sessionmaker(
     bind=sync_engine,
     expire_on_commit=False,
-    autoflush=False,
+    autoflush=True,  # queries flush pending changes first (avoids stale-count bugs)
     class_=Session,
 )
 
