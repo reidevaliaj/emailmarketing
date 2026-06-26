@@ -26,9 +26,19 @@ class Check:
     detail: str
 
 
+def _resolver() -> dns.resolver.Resolver:
+    """Resolver pinned to public DNS — the host's own resolver can serve stale
+    cache (e.g. an SPF record that was just changed)."""
+    r = dns.resolver.Resolver(configure=False)
+    r.nameservers = settings.dns_resolvers_list or ["1.1.1.1", "8.8.8.8"]
+    r.lifetime = 5.0
+    r.timeout = 5.0
+    return r
+
+
 def _txt(domain: str) -> list[str]:
     out: list[str] = []
-    answer = dns.resolver.resolve(domain, "TXT", lifetime=4.0)
+    answer = _resolver().resolve(domain, "TXT")
     for rec in answer:
         out.append(b"".join(rec.strings).decode(errors="replace"))
     return out
@@ -69,19 +79,19 @@ def _check_dkim(domain: str, selector: str) -> Check:
 
 
 def _check_mx(domain: str) -> Check:
+    # A dedicated SEND-ONLY domain intentionally has no MX (bounces return via
+    # the Postal return-path, not the domain's own MX). So "no MX" is fine here.
     try:
-        answer = dns.resolver.resolve(domain, "MX", lifetime=4.0)
-        if len(answer):
-            return Check("MX", True, f"{len(answer)} record(s)")
-        return Check("MX", False, "no MX records")
-    except Exception as exc:  # noqa: BLE001
-        return Check("MX", False, f"lookup failed: {type(exc).__name__}")
+        answer = _resolver().resolve(domain, "MX")
+        return Check("MX", True, f"{len(answer)} record(s) (optional for send-only)")
+    except Exception:  # noqa: BLE001
+        return Check("MX", True, "none — expected for a send-only domain")
 
 
 def _check_ptr(ip: str) -> Check:
     try:
         rev = dns.reversename.from_address(ip)
-        answer = dns.resolver.resolve(rev, "PTR", lifetime=4.0)
+        answer = _resolver().resolve(rev, "PTR")
         host = str(answer[0]).rstrip(".")
         return Check(f"PTR {ip}", True, host)
     except Exception as exc:  # noqa: BLE001

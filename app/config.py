@@ -50,7 +50,8 @@ class Settings(BaseSettings):
     postal_use_mock: bool = True
     postal_api_url: str = "https://postal.example.com"
     postal_api_key: str = "CHANGE_ME"
-    postal_message_path: str = "/api/v1/send/message"
+    postal_message_path: str = "/api/v1/send/message"  # legacy (multipart/mixed builder)
+    postal_raw_path: str = "/api/v1/send/raw"          # raw RFC822 (clean MIME, used now)
     postal_webhook_shared_secret: str = "CHANGE_ME"
 
     # ---- Sending identity ----
@@ -79,6 +80,9 @@ class Settings(BaseSettings):
     verify_dns_timeout_seconds: float = 3.0
     verify_dns_concurrency: int = 80
     verify_provider: str = "inhouse"
+    # Public resolvers for preflight + verification. The host's own resolver
+    # (Contabo) can serve stale cache; these give consistent answers.
+    dns_resolvers: str = "1.1.1.1,8.8.8.8"
 
     # ---- Free-provider filter ----
     free_provider_filter_default: bool = True
@@ -113,6 +117,10 @@ class Settings(BaseSettings):
     @property
     def sending_ips_list(self) -> list[str]:
         return [ip.strip() for ip in self.sending_ips.split(",") if ip.strip()]
+
+    @property
+    def dns_resolvers_list(self) -> list[str]:
+        return [r.strip() for r in self.dns_resolvers.split(",") if r.strip()]
 
     @property
     def app_base_url_clean(self) -> str:

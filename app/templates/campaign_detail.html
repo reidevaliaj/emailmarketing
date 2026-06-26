@@ -61,6 +61,13 @@
           onsubmit="return confirm('Cancel this campaign?');">
       <button class="btn btn-danger">Cancel</button></form>
   {% endif %}
+  <form method="post" action="/campaigns/{{ campaign.id }}/duplicate" style="display:inline">
+    <button class="btn">Duplicate</button></form>
+  {% if campaign.status != 'sending' %}
+    <form method="post" action="/campaigns/{{ campaign.id }}/delete" style="display:inline"
+          onsubmit="return confirm('Delete this campaign permanently?');">
+      <button class="btn btn-danger">Delete</button></form>
+  {% endif %}
   {% if campaign.status in ('sending','scheduled') %}
     <p class="muted" style="margin-top:.6rem">This page auto-refreshes counters every 15s.</p>
   {% endif %}

@@ -170,3 +170,35 @@ async def cancel(session: AsyncSession, campaign: Campaign) -> bool:
     campaign.status = CampaignStatus.CANCELLED.value
     await session.flush()
     return True
+
+
+async def duplicate_campaign(session: AsyncSession, campaign_id: int) -> Campaign | None:
+    """Clone a campaign as a fresh DRAFT (no recipients/counters copied)."""
+    src = await session.get(Campaign, campaign_id)
+    if src is None:
+        return None
+    dup = Campaign(
+        name=f"Copy of {src.name}",
+        subject=src.subject,
+        from_name=src.from_name,
+        from_email=src.from_email,
+        template_id=src.template_id,
+        list_id=src.list_id,
+        ip_pool=src.ip_pool,
+        status=CampaignStatus.DRAFT.value,
+    )
+    session.add(dup)
+    await session.flush()
+    return dup
+
+
+async def delete_campaign(session: AsyncSession, campaign_id: int) -> bool:
+    """Delete a campaign (recipients + events cascade). A sending campaign must
+    be cancelled first."""
+    campaign = await session.get(Campaign, campaign_id)
+    if campaign is None:
+        return False
+    if campaign.status == CampaignStatus.SENDING.value:
+        return False
+    await session.delete(campaign)
+    return True

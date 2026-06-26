@@ -238,3 +238,35 @@ async def cancel_campaign(
     else:
         flash(request, "Campaign cannot be cancelled.", "error")
     return RedirectResponse(f"/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/campaigns/{campaign_id}/duplicate")
+async def duplicate_campaign(
+    request: Request,
+    campaign_id: int,
+    session: AsyncSession = Depends(get_db),
+    user=Depends(current_user),
+):
+    dup = await camp_svc.duplicate_campaign(session, campaign_id)
+    await session.commit()
+    if dup is None:
+        flash(request, "Campaign not found.", "error")
+        return RedirectResponse("/campaigns", status_code=303)
+    flash(request, "Campaign duplicated as a new draft.", "success")
+    return RedirectResponse(f"/campaigns/{dup.id}", status_code=303)
+
+
+@router.post("/campaigns/{campaign_id}/delete")
+async def delete_campaign(
+    request: Request,
+    campaign_id: int,
+    session: AsyncSession = Depends(get_db),
+    user=Depends(current_user),
+):
+    ok = await camp_svc.delete_campaign(session, campaign_id)
+    await session.commit()
+    if ok:
+        flash(request, "Campaign deleted.", "success")
+        return RedirectResponse("/campaigns", status_code=303)
+    flash(request, "Cancel the campaign before deleting it.", "error")
+    return RedirectResponse(f"/campaigns/{campaign_id}", status_code=303)

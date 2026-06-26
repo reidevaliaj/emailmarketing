@@ -55,7 +55,8 @@ class InHouseVerificationProvider:
 
     async def _check_domain(self, domain: str) -> tuple[VerificationResult, str | None]:
         """Resolve a single domain's mail-receiving status (uncached)."""
-        resolver = dns.asyncresolver.Resolver()
+        resolver = dns.asyncresolver.Resolver(configure=False)
+        resolver.nameservers = settings.dns_resolvers_list or ["1.1.1.1", "8.8.8.8"]
         resolver.timeout = self._timeout
         resolver.lifetime = self._timeout
         try:
