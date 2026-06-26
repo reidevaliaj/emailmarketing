@@ -92,8 +92,12 @@ services:
       - "443:443"
     volumes:
       - ./deploy/nginx/dashboard.cod-st.com.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx/postal.cod-st.com.conf:/etc/nginx/conf.d/postal.conf:ro
       - ./deploy/certbot/conf:/etc/letsencrypt:ro
       - ./deploy/certbot/www:/var/www/certbot:ro
+    # Lets the postal.cod-st.com vhost reach Postal (host network, port 5000).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - app
     # Reload every 6h so renewed certs are picked up without downtime.

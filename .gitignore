@@ -44,3 +44,6 @@ redis-data/
 # Celery beat schedule (local runtime)
 celerybeat-schedule*
 celerybeat.pid
+
+# Let's Encrypt certs/keys (runtime, NEVER commit)
+deploy/certbot/
