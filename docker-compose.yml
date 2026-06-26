@@ -1,0 +1,115 @@
+# Full application stack. Postal runs as its OWN separate Docker stack
+# (installed per the official guide) — this compose file is just our web app,
+# workers, datastores, and the TLS reverse proxy in front of them.
+#
+# Copy .env.example -> .env and fill it in first. POSTGRES_URL must point at the
+# `postgres` service host and use the asyncpg driver, e.g.:
+#   POSTGRES_URL=postgresql+asyncpg://emailmarketing:PASSWORD@postgres:5432/emailmarketing
+#   REDIS_URL=redis://redis:6379/0
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-emailmarketing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-emailmarketing}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-emailmarketing}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot: run migrations + seed the admin user, then exit. Everything else
+  # waits for this to finish successfully.
+  migrate:
+    build: .
+    command: sh -c "alembic upgrade head && python -m scripts.seed_admin"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - uploads:/var/lib/emailmarketing/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: sh -c "celery -A app.celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-4}"
+    env_file: .env
+    volumes:
+      - uploads:/var/lib/emailmarketing/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  beat:
+    build: .
+    restart: unless-stopped
+    command: celery -A app.celery_app.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/dashboard.cod-st.com.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certbot/conf:/etc/letsencrypt:ro
+      - ./deploy/certbot/www:/var/www/certbot:ro
+    depends_on:
+      - app
+    # Reload every 6h so renewed certs are picked up without downtime.
+    command: sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
+
+  # Run on demand to obtain/renew certs (see DEPLOYMENT.md). Webroot challenge.
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./deploy/certbot/conf:/etc/letsencrypt
+      - ./deploy/certbot/www:/var/www/certbot
+    # Default: attempt renewal then exit. Use the explicit `certonly` command
+    # from DEPLOYMENT.md for the first issuance.
+    entrypoint: sh -c "trap exit TERM; certbot renew; sleep 1"
+
+volumes:
+  postgres-data:
+  redis-data:
+  uploads:
