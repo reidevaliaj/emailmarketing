@@ -23,7 +23,7 @@ from app.models.enums import CampaignStatus
 from app.models.suppression import Suppression
 from app.models.template import Template
 from app.services.merge import has_unsubscribe
-from app.services.normalize import domain_of
+from app.services.normalize import domain_of, validate_syntax
 
 
 async def list_campaigns(session: AsyncSession) -> list[Campaign]:
@@ -40,6 +40,7 @@ async def create_campaign(session: AsyncSession, **fields) -> Campaign:
         subject=fields.get("subject") or "",
         from_name=fields.get("from_name") or settings.default_from_name,
         from_email=fields.get("from_email") or settings.default_from_email,
+        reply_to=(fields.get("reply_to") or settings.default_reply_to) or None,
         template_id=fields.get("template_id"),
         list_id=fields.get("list_id"),
         ip_pool=fields.get("ip_pool"),
@@ -56,9 +57,10 @@ async def update_campaign(session: AsyncSession, campaign_id: int, **fields) -> 
         CampaignStatus.DRAFT.value, CampaignStatus.SCHEDULED.value
     ):
         return None  # only editable while draft/scheduled
-    for key in ("name", "subject", "from_name", "from_email", "template_id", "list_id", "ip_pool"):
+    for key in ("name", "subject", "from_name", "from_email", "reply_to",
+                "template_id", "list_id", "ip_pool"):
         if key in fields and fields[key] is not None:
-            setattr(campaign, key, fields[key])
+            setattr(campaign, key, (fields[key] or None) if key == "reply_to" else fields[key])
     await session.flush()
     return campaign
 
@@ -82,10 +84,14 @@ async def validate_for_send(session: AsyncSession, campaign: Campaign) -> Valida
         res.errors.append("Subject is empty.")
     if not campaign.from_email:
         res.errors.append("From address is empty.")
-    elif domain_of(campaign.from_email) != settings.sending_domain.lower():
+    elif domain_of(campaign.from_email) not in settings.allowed_from_domains_list:
+        allowed = ", ".join(settings.allowed_from_domains_list)
         res.errors.append(
-            f"From address must be on the sending domain ({settings.sending_domain})."
+            f"From address must be on a domain configured in Postal ({allowed}). "
+            "Use Reply-To for a different reply address."
         )
+    if campaign.reply_to and not validate_syntax(campaign.reply_to).ok:
+        res.errors.append("Reply-To is not a valid email address.")
     if campaign.template_id is not None:
         template = await session.get(Template, campaign.template_id)
         if template is None:

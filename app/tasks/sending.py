@@ -253,6 +253,7 @@ def send_one(self, campaign_recipient_id: int) -> str:
             subject_tpl = campaign.subject
             from_name = campaign.from_name
             from_email = campaign.from_email
+            reply_to = campaign.reply_to
             merge = dict(cr.merge_snapshot or {})
             template = (
                 session.get(Template, campaign.template_id) if campaign.template_id else None
@@ -296,6 +297,7 @@ def send_one(self, campaign_recipient_id: int) -> str:
             to=email,
             from_email=from_email,
             from_name=from_name,
+            reply_to=reply_to or None,
             subject=rendered_subject,
             plain_body=None if is_html else rendered_body,
             html_body=rendered_body if is_html else None,

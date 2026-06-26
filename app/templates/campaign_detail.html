@@ -10,6 +10,7 @@
 <div class="meta">
   <span>Subject: <strong>{{ campaign.subject }}</strong></span>
   <span>From: {{ campaign.from_name }} &lt;{{ campaign.from_email }}&gt;</span>
+  {% if campaign.reply_to %}<span>Reply-To: {{ campaign.reply_to }}</span>{% endif %}
   <span>Pool: {{ campaign.ip_pool or 'default' }}</span>
   {% if campaign.scheduled_at %}<span>Scheduled: {{ campaign.scheduled_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>{% endif %}
 </div>

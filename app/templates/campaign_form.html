@@ -11,6 +11,9 @@
     <label>From name<input type="text" name="from_name" value="{{ campaign.from_name if campaign else settings.default_from_name }}"></label>
     <label>From email<input type="email" name="from_email" value="{{ campaign.from_email if campaign else settings.default_from_email }}"></label>
   </div>
+  <label>Reply-To <span class="muted">(optional — where replies go, e.g. info@cod-st.com; any domain)</span>
+    <input type="email" name="reply_to" value="{{ (campaign.reply_to or '') if campaign else settings.default_reply_to }}" placeholder="info@cod-st.com">
+  </label>
   <div class="two-col">
     <label>List
       <select name="list_id" required>

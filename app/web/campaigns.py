@@ -64,6 +64,7 @@ async def create_campaign(
     subject: str = Form(""),
     from_name: str = Form(""),
     from_email: str = Form(""),
+    reply_to: str = Form(""),
     list_id: int | None = Form(None),
     template_id: int | None = Form(None),
     ip_pool: str = Form(""),
@@ -74,6 +75,7 @@ async def create_campaign(
         session, name=name, subject=subject,
         from_name=from_name or settings.default_from_name,
         from_email=from_email or settings.default_from_email,
+        reply_to=reply_to,
         list_id=list_id, template_id=template_id, ip_pool=ip_pool or None,
     )
     await session.commit()
@@ -146,6 +148,7 @@ async def update_campaign(
     subject: str = Form(""),
     from_name: str = Form(""),
     from_email: str = Form(""),
+    reply_to: str = Form(""),
     list_id: int | None = Form(None),
     template_id: int | None = Form(None),
     ip_pool: str = Form(""),
@@ -154,7 +157,8 @@ async def update_campaign(
 ):
     updated = await camp_svc.update_campaign(
         session, campaign_id, name=name, subject=subject, from_name=from_name,
-        from_email=from_email, list_id=list_id, template_id=template_id, ip_pool=ip_pool or None,
+        from_email=from_email, reply_to=reply_to, list_id=list_id,
+        template_id=template_id, ip_pool=ip_pool or None,
     )
     await session.commit()
     if updated is None:

@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     sending_domain: str = "marketing.cod-st.com"
     default_from_name: str = "COD-ST"
     default_from_email: str = "news@marketing.cod-st.com"
+    # Optional default Reply-To prefilled on new campaigns (any address).
+    default_reply_to: str = ""
+    # From-domain allow-list. Empty => just the sending domain. Add more here
+    # ONLY after configuring them as domains in Postal (else Postal rejects them).
+    allowed_from_domains: str = ""
     dkim_selector: str = "postal"
     dmarc_report_email: str = "dmarc@cod-st.com"
     # Optional comma-separated sending IPs, used only for PTR/rDNS preflight.
@@ -121,6 +126,11 @@ class Settings(BaseSettings):
     @property
     def dns_resolvers_list(self) -> list[str]:
         return [r.strip() for r in self.dns_resolvers.split(",") if r.strip()]
+
+    @property
+    def allowed_from_domains_list(self) -> list[str]:
+        extra = [d.strip().lower() for d in self.allowed_from_domains.split(",") if d.strip()]
+        return list({self.sending_domain.lower(), *extra})
 
     @property
     def app_base_url_clean(self) -> str:

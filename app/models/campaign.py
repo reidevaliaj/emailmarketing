@@ -17,6 +17,10 @@ class Campaign(Base):
     subject: Mapped[str] = mapped_column(String(500), nullable=False)
     from_name: Mapped[str] = mapped_column(String(200), nullable=False)
     from_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    # Optional Reply-To — may be ANY address (e.g. info@cod-st.com). No SPF/DKIM
+    # impact, so replies can route to the real business inbox while From stays on
+    # the reputation-isolated sending domain.
+    reply_to: Mapped[str | None] = mapped_column(String(320), nullable=True)
 
     template_id: Mapped[int | None] = mapped_column(
         ForeignKey("templates.id", ondelete="RESTRICT"), nullable=True

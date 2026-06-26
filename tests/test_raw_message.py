@@ -45,6 +45,16 @@ def test_plain_and_html_is_alternative_not_mixed():
     assert _ct(m) == "multipart/alternative"
 
 
+def test_reply_to_can_differ_from_from():
+    m = SendMessage(
+        to="x@corp.com", from_email="news@marketing.cod-st.com", from_name="COD-ST",
+        reply_to="info@cod-st.com", subject="S", plain_body="b",
+    )
+    raw = build_raw_message(m).decode()
+    assert "From: COD-ST <news@marketing.cod-st.com>" in raw
+    assert "Reply-To: info@cod-st.com" in raw
+
+
 def test_required_headers_present():
     m = SendMessage(
         to="x@corp.com", from_email="news@marketing.cod-st.com", from_name="X",
