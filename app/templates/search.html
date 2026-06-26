@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Search — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Find &amp; suppress an address</h1>
+<p class="muted">Search the whole system by full address, partial text, or domain.
+  Use this when a contact converts, asks to stop, or complains — then remove &amp; suppress so they're never emailed again.</p>
+
+<form method="get" action="/search" class="inline-form">
+  <input type="text" name="q" value="{{ q }}" placeholder="email, partial, or domain" autofocus style="min-width:320px">
+  <button type="submit" class="btn btn-primary">Search</button>
+</form>
+
+{% if q %}
+  {% if hits %}
+  <table>
+    <thead><tr><th>Email</th><th>List</th><th>Status</th><th>Suppressed?</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for h in hits %}
+      <tr>
+        <td>{{ h.email }}</td>
+        <td>{{ h.list_name or '—' }}</td>
+        <td>{% if h.contact %}<span class="badge badge-{{ h.contact.status }}">{{ h.contact.status }}</span>{% else %}—{% endif %}</td>
+        <td>{% if h.suppressed %}<span class="badge badge-bounced">{{ h.suppression_reason }}</span>{% else %}no{% endif %}</td>
+        <td>
+          {% if not h.suppressed %}
+          <form method="post" action="/search/remove" style="display:inline"
+                onsubmit="return confirm('Remove and globally suppress {{ h.email }}?');">
+            <input type="hidden" name="email" value="{{ h.email }}">
+            <button class="btn btn-small btn-danger">Remove &amp; suppress</button>
+          </form>
+          {% else %}<span class="muted">already suppressed</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No matches for "{{ q }}".</p>
+  <form method="post" action="/suppress/add" class="inline-form" onsubmit="return confirm('Add {{ q }} to global suppression?');">
+    <input type="hidden" name="email" value="{{ q }}">
+    <button class="btn btn-danger">Suppress "{{ q }}" anyway</button>
+  </form>
+  {% endif %}
+{% endif %}
+{% endblock %}

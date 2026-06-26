@@ -120,7 +120,10 @@ def _daily_key(ip_pool: str) -> str:
 
 
 def daily_cap_usage(client: "redis_lib.Redis", ip_pool: str) -> int:
-    val = client.get(_daily_key(ip_pool))
+    try:
+        val = client.get(_daily_key(ip_pool))
+    except redis_lib.RedisError:
+        return 0  # dashboard stays up even if Redis is momentarily unavailable
     return int(val) if val else 0
 
 

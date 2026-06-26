@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Lists — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Contact lists</h1>
+
+<section class="panel">
+  <h2>Upload a CSV</h2>
+  <form method="post" action="/lists/upload" enctype="multipart/form-data">
+    <label>List name<input type="text" name="name" required placeholder="e.g. Q3 outreach"></label>
+    <label>CSV file<input type="file" name="file" accept=".csv,text/csv" required></label>
+    <label class="checkbox">
+      <input type="checkbox" name="apply_free_filter" checked>
+      Filter out consumer/free-mail domains (recommended for B2B)
+    </label>
+    <button type="submit" class="btn btn-primary">Upload &amp; import</button>
+  </form>
+  <p class="muted">Emails are normalized, de-duplicated, checked against global suppression,
+  and verified (syntax + MX) in the background.</p>
+</section>
+
+<section>
+  <h2>Your lists</h2>
+  {% if lists %}
+  <table>
+    <thead><tr><th>Name</th><th>Contacts</th><th>Status</th><th>Uploaded</th></tr></thead>
+    <tbody>
+      {% for l in lists %}
+      <tr>
+        <td><a href="/lists/{{ l.id }}">{{ l.name }}</a></td>
+        <td>{{ l.contact_count }}</td>
+        <td><span class="badge">{{ l.verification_status }}</span></td>
+        <td>{{ l.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No lists yet. Upload a CSV above.</p>
+  {% endif %}
+</section>
+{% endblock %}

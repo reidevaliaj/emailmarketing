@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Campaigns — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="row-between">
+  <h1>Campaigns</h1>
+  <a href="/campaigns/new" class="btn btn-primary">New campaign</a>
+</div>
+
+{% if campaigns %}
+<table>
+  <thead><tr><th>Name</th><th>Status</th><th>Sent</th><th>Delivered</th><th>Bounced</th><th>Scheduled</th></tr></thead>
+  <tbody>
+    {% for c in campaigns %}
+    {% set p = progress(c) %}
+    <tr>
+      <td><a href="/campaigns/{{ c.id }}">{{ c.name }}</a></td>
+      <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
+      <td>{{ p.sent }}</td><td>{{ p.delivered }}</td><td>{{ p.bounced }}</td>
+      <td>{{ c.scheduled_at.strftime('%Y-%m-%d %H:%M') if c.scheduled_at else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No campaigns yet. <a href="/campaigns/new">Create one</a>.</p>
+{% endif %}
+{% endblock %}

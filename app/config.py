@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     default_from_email: str = "news@marketing.cod-st.com"
     dkim_selector: str = "postal"
     dmarc_report_email: str = "dmarc@cod-st.com"
+    # Optional comma-separated sending IPs, used only for PTR/rDNS preflight.
+    sending_ips: str = ""
 
     # ---- Rate pacing & warming ----
     rate_global_per_minute: int = 20
@@ -69,6 +71,9 @@ class Settings(BaseSettings):
 
     # ---- Worker ----
     celery_worker_concurrency: int = 4
+
+    # ---- Uploads (must be shared between app and worker containers) ----
+    upload_dir: str = "/tmp/emk_uploads"
 
     # ---- Verification ----
     verify_dns_timeout_seconds: float = 3.0
@@ -104,6 +109,10 @@ class Settings(BaseSettings):
     @property
     def is_sqlite(self) -> bool:
         return self.postgres_url.startswith("sqlite")
+
+    @property
+    def sending_ips_list(self) -> list[str]:
+        return [ip.strip() for ip in self.sending_ips.split(",") if ip.strip()]
 
     @property
     def app_base_url_clean(self) -> str:

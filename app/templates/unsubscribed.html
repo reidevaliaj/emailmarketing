@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unsubscribed</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="container narrow">
+  <div class="auth-card">
+    {% if ok %}
+      <h1>You're unsubscribed</h1>
+      <p><strong>{{ email }}</strong> has been removed and will not receive further emails.</p>
+    {% else %}
+      <h1>Unsubscribe failed</h1>
+      <p>This link is invalid or has expired. If you keep receiving emails, reply and ask to be removed.</p>
+    {% endif %}
+  </div>
+</main>
+</body>
+</html>

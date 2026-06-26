@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ lst.name }} — {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/lists">&larr; Lists</a></p>
+<div class="row-between">
+  <h1>{{ lst.name }}</h1>
+  <form method="post" action="/lists/{{ lst.id }}/delete" onsubmit="return confirm('Delete this list and its contacts?');">
+    <button type="submit" class="btn btn-danger">Delete list</button>
+  </form>
+</div>
+
+<div class="meta">
+  <span>{{ lst.contact_count }} contacts</span>
+  <span>Status: <strong>{{ lst.verification_status }}</strong></span>
+  {% if lst.source_filename %}<span>From: {{ lst.source_filename }}</span>{% endif %}
+</div>
+
+{% if lst.import_summary %}
+<section class="panel">
+  <h2>Import report</h2>
+  <ul class="kv">
+    <li>Imported: <strong>{{ lst.import_summary.imported }}</strong></li>
+    <li>Skipped — duplicate: {{ lst.import_summary.skipped_duplicate }}</li>
+    <li>Skipped — suppressed: {{ lst.import_summary.skipped_suppressed }}</li>
+    <li>Skipped — free provider: {{ lst.import_summary.skipped_free_provider }}</li>
+    <li>Skipped — invalid: {{ lst.import_summary.skipped_invalid }}</li>
+    {% if lst.import_summary.error_rows %}<li>Bad rows: {{ lst.import_summary.error_rows }}</li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+
+{% if lst.verification_summary %}
+<section class="panel">
+  <h2>Verification {% if lst.verification_status in ('verifying','pending_verification') %}<span class="muted">(in progress)</span>{% endif %}</h2>
+  <ul class="kv">
+    <li>Valid: <strong>{{ lst.verification_summary.valid or 0 }}</strong></li>
+    <li>Invalid: {{ lst.verification_summary.invalid or 0 }}</li>
+    <li>Unknown: {{ lst.verification_summary.unknown or 0 }}</li>
+    <li>Processed: {{ lst.verification_summary.processed or 0 }} / {{ lst.verification_summary.total or 0 }}</li>
+  </ul>
+  {% if lst.verification_summary.failed_domains %}
+  <details><summary>Failed domains ({{ lst.verification_summary.failed_domains|length }})</summary>
+    <p class="muted">{{ lst.verification_summary.failed_domains|join(', ') }}</p>
+  </details>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Add a contact</h2>
+  <form method="post" action="/lists/{{ lst.id }}/contacts" class="inline-form">
+    <input type="email" name="email" placeholder="email@company.com" required>
+    <input type="text" name="first_name" placeholder="First name">
+    <input type="text" name="last_name" placeholder="Last name">
+    <button type="submit" class="btn">Add</button>
+  </form>
+</section>
+
+<section>
+  <h2>Contacts ({{ total }})</h2>
+  <table>
+    <thead><tr><th>Email</th><th>Name</th><th>Status</th><th>Verification</th></tr></thead>
+    <tbody>
+      {% for c in contacts %}
+      <tr>
+        <td>{{ c.email }}</td>
+        <td>{{ c.first_name or '' }} {{ c.last_name or '' }}</td>
+        <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
+        <td>{{ c.verification_result }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No contacts yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if pages > 1 %}
+  <div class="pager">
+    {% if page > 1 %}<a href="/lists/{{ lst.id }}?page={{ page-1 }}">&larr; Prev</a>{% endif %}
+    <span>Page {{ page }} / {{ pages }}</span>
+    {% if page < pages %}<a href="/lists/{{ lst.id }}?page={{ page+1 }}">Next &rarr;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

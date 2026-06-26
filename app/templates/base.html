@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% if user_email %}
+<header class="topbar">
+  <div class="brand"><a href="/">{{ app_name }}</a></div>
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/lists">Lists</a>
+    <a href="/templates">Templates</a>
+    <a href="/campaigns">Campaigns</a>
+    <a href="/search">Search</a>
+    <a href="/settings">Settings</a>
+  </nav>
+  <div class="account">
+    <span>{{ user_email }}</span>
+    <a href="/logout">Log out</a>
+  </div>
+</header>
+{% endif %}
+
+<main class="container">
+  {% for f in flashes %}
+    <div class="flash flash-{{ f.c }}">{{ f.m }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

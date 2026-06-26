@@ -27,6 +27,7 @@ celery_app = Celery(
         "app.tasks.scheduler",
         "app.tasks.verification",
         "app.tasks.webhooks",
+        "app.tasks.imports",
     ],
 )
 

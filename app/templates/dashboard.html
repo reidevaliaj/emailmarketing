@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="cards">
+  <div class="card"><div class="card-num">{{ stats.totals.sent }}</div><div class="card-label">Sent</div></div>
+  <div class="card"><div class="card-num">{{ stats.totals.delivered }}</div><div class="card-label">Delivered</div></div>
+  <div class="card"><div class="card-num">{{ stats.totals.bounced }}</div><div class="card-label">Bounced</div></div>
+  <div class="card"><div class="card-num">{{ stats.totals.failed }}</div><div class="card-label">Failed</div></div>
+  <div class="card {% if stats.bounce_rate >= 5 %}card-warn{% endif %}">
+    <div class="card-num">{{ stats.bounce_rate }}%</div><div class="card-label">Bounce rate</div>
+  </div>
+  <div class="card"><div class="card-num">{{ stats.suppression_size }}</div><div class="card-label">Suppressed</div></div>
+</div>
+
+<section>
+  <h2>Per-IP volume today</h2>
+  <table>
+    <thead><tr><th>Pool</th><th>Sent today</th><th>Daily cap</th><th></th></tr></thead>
+    <tbody>
+      {% for p in stats.per_pool_today %}
+      <tr>
+        <td>{{ p.pool }}</td>
+        <td>{{ p.sent_today }}</td>
+        <td>{{ p.cap }}</td>
+        <td><div class="bar"><span style="width: {{ ((p.sent_today / p.cap * 100) if p.cap else 0)|round(0,'floor') }}%"></span></div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Deliverability preflight</h2>
+  {% if preflight %}
+  <ul class="checks">
+    {% for c in preflight %}
+    <li class="{{ 'ok' if c.ok else 'bad' }}">
+      <strong>{{ c.name }}</strong>: {{ c.detail }}
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="muted">Best-effort DNS checks. Warnings do not block sending — fix DNS before warming.</p>
+  {% else %}
+  <p class="muted">No preflight data (checks run at startup).</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Recent campaigns</h2>
+  {% if stats.campaigns %}
+  <table>
+    <thead><tr><th>Name</th><th>Status</th><th>Sent</th><th>Delivered</th><th>Bounced</th><th>Pending</th></tr></thead>
+    <tbody>
+      {% for c in stats.campaigns %}
+      <tr>
+        <td><a href="/campaigns/{{ c.id }}">{{ c.name }}</a></td>
+        <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
+        <td>{{ c.sent }}</td><td>{{ c.delivered }}</td><td>{{ c.bounced }}</td><td>{{ c.pending }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No campaigns yet. <a href="/campaigns/new">Create one</a>.</p>
+  {% endif %}
+</section>
+{% endblock %}

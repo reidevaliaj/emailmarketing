@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ campaign.name }} — {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/campaigns">&larr; Campaigns</a></p>
+<div class="row-between">
+  <h1>{{ campaign.name }}</h1>
+  <span class="badge badge-{{ campaign.status }}">{{ campaign.status }}</span>
+</div>
+
+<div class="meta">
+  <span>Subject: <strong>{{ campaign.subject }}</strong></span>
+  <span>From: {{ campaign.from_name }} &lt;{{ campaign.from_email }}&gt;</span>
+  <span>Pool: {{ campaign.ip_pool or 'default' }}</span>
+  {% if campaign.scheduled_at %}<span>Scheduled: {{ campaign.scheduled_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>{% endif %}
+</div>
+
+<!-- Counters -->
+<div class="cards">
+  <div class="card"><div class="card-num">{{ progress.total }}</div><div class="card-label">Total</div></div>
+  <div class="card"><div class="card-num">{{ progress.sent }}</div><div class="card-label">Sent</div></div>
+  <div class="card"><div class="card-num">{{ progress.delivered }}</div><div class="card-label">Delivered</div></div>
+  <div class="card"><div class="card-num">{{ progress.bounced }}</div><div class="card-label">Bounced</div></div>
+  <div class="card"><div class="card-num">{{ progress.failed }}</div><div class="card-label">Failed</div></div>
+  <div class="card"><div class="card-num">{{ progress.skipped_suppressed }}</div><div class="card-label">Suppressed</div></div>
+  <div class="card"><div class="card-num">{{ progress.pending }}</div><div class="card-label">Pending</div></div>
+</div>
+
+<!-- Actions -->
+<section class="panel">
+  <h2>Actions</h2>
+  {% if campaign.status in ('draft', 'scheduled') %}
+    {% if summary.errors %}
+      <div class="flash flash-error">
+        Cannot send yet:
+        <ul>{% for e in summary.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+      </div>
+    {% else %}
+      <p>Ready to send to <strong>{{ summary.recipients }}</strong> recipients
+        ({{ summary.suppressed_excluded }} suppressed excluded). Estimated duration
+        ~<strong>{{ summary.estimated_minutes }}</strong> min at current rate.</p>
+    {% endif %}
+    <form method="post" action="/campaigns/{{ campaign.id }}/schedule" class="inline-form">
+      <input type="datetime-local" name="scheduled_at">
+      <button type="submit" class="btn btn-primary" {{ 'disabled' if summary.errors }}>Schedule</button>
+      <button type="submit" name="send_now" value="1" class="btn btn-primary" {{ 'disabled' if summary.errors }}>Send now</button>
+    </form>
+    <a href="/campaigns/{{ campaign.id }}/edit" class="btn">Edit</a>
+    <span class="muted">Times are in {{ settings.app_timezone }}.</span>
+  {% endif %}
+
+  {% if campaign.status == 'sending' %}
+    <form method="post" action="/campaigns/{{ campaign.id }}/pause" style="display:inline">
+      <button class="btn">Pause</button></form>
+  {% endif %}
+  {% if campaign.status == 'paused' %}
+    <form method="post" action="/campaigns/{{ campaign.id }}/resume" style="display:inline">
+      <button class="btn btn-primary">Resume</button></form>
+  {% endif %}
+  {% if campaign.status in ('draft','scheduled','sending','paused') %}
+    <form method="post" action="/campaigns/{{ campaign.id }}/cancel" style="display:inline"
+          onsubmit="return confirm('Cancel this campaign?');">
+      <button class="btn btn-danger">Cancel</button></form>
+  {% endif %}
+  {% if campaign.status in ('sending','scheduled') %}
+    <p class="muted" style="margin-top:.6rem">This page auto-refreshes counters every 15s.</p>
+  {% endif %}
+</section>
+
+<!-- Recipient ledger -->
+<section>
+  <h2>Recipient ledger</h2>
+  <table>
+    <thead><tr><th>Email</th><th>Status</th><th>Postal id</th><th>Last event</th><th>Error</th></tr></thead>
+    <tbody>
+      {% for r in recipients %}
+      <tr>
+        <td>{{ r.email_snapshot }}</td>
+        <td><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
+        <td class="mono">{{ (r.postal_message_id or '')[:16] }}</td>
+        <td>{{ r.last_event_at.strftime('%m-%d %H:%M') if r.last_event_at else '—' }}</td>
+        <td class="muted">{{ (r.error_detail or '')[:60] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No recipients yet (materializes when sending starts).</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="pager">
+    {% if page > 1 %}<a href="/campaigns/{{ campaign.id }}?page={{ page-1 }}">&larr; Prev</a>{% endif %}
+    <span>Page {{ page }}</span>
+    {% if recipients|length == 50 %}<a href="/campaigns/{{ campaign.id }}?page={{ page+1 }}">Next &rarr;</a>{% endif %}
+  </div>
+</section>
+
+{% block scripts %}
+{% if campaign.status in ('sending','scheduled') %}
+<script>setTimeout(() => location.reload(), 15000);</script>
+{% endif %}
+{% endblock %}
+{% endblock %}

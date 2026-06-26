@@ -29,7 +29,9 @@ from app.config import settings
 
 _async_connect_args: dict = {}
 if settings.is_sqlite:
-    _async_connect_args = {"check_same_thread": False}
+    # busy timeout lets concurrent writers wait on the lock (dev/tests only;
+    # production uses Postgres). check_same_thread off for the async driver.
+    _async_connect_args = {"check_same_thread": False, "timeout": 30}
 
 async_engine = create_async_engine(
     settings.postgres_url,
@@ -59,7 +61,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 _sync_connect_args: dict = {}
 if settings.sync_database_url.startswith("sqlite"):
-    _sync_connect_args = {"check_same_thread": False}
+    _sync_connect_args = {"check_same_thread": False, "timeout": 30}
 
 sync_engine = create_engine(
     settings.sync_database_url,

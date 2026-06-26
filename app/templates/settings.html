@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Settings — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+<section class="panel">
+  <h2>Free-provider filter</h2>
+  <p class="muted">Consumer/free-mail domains excluded at import to protect B2B sender reputation.
+    One pattern per line. <code>gmail.com</code> = exact, <code>hotmail.</code> = prefix, <code>gmx.*</code> = prefix.</p>
+  <form method="post" action="/settings/free-provider">
+    <label class="checkbox">
+      <input type="checkbox" name="enabled" {{ 'checked' if free_enabled }}> Filter enabled
+    </label>
+    <label>Blocked domains
+      <textarea name="domains" rows="10">{{ free_domains }}</textarea>
+    </label>
+    <button type="submit" class="btn btn-primary">Save filter</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Status API keys</h2>
+  <p class="muted">Use with header <code>X-API-Key</code> against <code>/api/status</code>.</p>
+  <form method="post" action="/settings/api-keys" class="inline-form">
+    <input type="text" name="name" placeholder="key name (e.g. monitoring)" required>
+    <button type="submit" class="btn">Create key</button>
+  </form>
+  {% if api_keys %}
+  <table>
+    <thead><tr><th>Name</th><th>Created</th><th>Last used</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+      {% for k in api_keys %}
+      <tr>
+        <td>{{ k.name }}</td>
+        <td>{{ k.created_at.strftime('%Y-%m-%d') }}</td>
+        <td>{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') if k.last_used_at else 'never' }}</td>
+        <td>{{ 'yes' if k.is_active else 'revoked' }}</td>
+        <td>{% if k.is_active %}
+          <form method="post" action="/settings/api-keys/{{ k.id }}/revoke" style="display:inline">
+            <button class="btn btn-small btn-danger">Revoke</button></form>
+        {% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}

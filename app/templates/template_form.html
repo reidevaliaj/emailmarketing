@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if template else 'New' }} template — {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/templates">&larr; Templates</a></p>
+<h1>{{ 'Edit template' if template else 'New template' }}</h1>
+
+{% if validation and not validation.has_unsubscribe %}
+<div class="flash flash-error">This template is missing <code>{{ '{{unsubscribe_url}}' }}</code>. Campaigns using it cannot be sent until added.</div>
+{% endif %}
+{% if validation and validation.unknown_tags %}
+<div class="flash flash-info">Non-standard tags (will render from custom fields or blank): {{ validation.unknown_tags|join(', ') }}</div>
+{% endif %}
+
+<form method="post" action="{{ ('/templates/' ~ template.id) if template else '/templates' }}">
+  <label>Name<input type="text" name="name" required value="{{ template.name if template else '' }}"></label>
+  <label>Type
+    <select name="type" id="type">
+      <option value="plain" {{ 'selected' if template and template.type == 'plain' }}>Plain text</option>
+      <option value="html" {{ 'selected' if template and template.type == 'html' }}>HTML</option>
+    </select>
+  </label>
+  <label>Default subject<input type="text" name="subject_default" value="{{ template.subject_default or '' if template else '' }}"></label>
+  <label>Body
+    <textarea name="body" id="body" rows="16">{{ template.body if template else '' }}</textarea>
+  </label>
+  <p class="muted">Merge tags: <code>{{ '{{first_name}}' }}</code>, <code>{{ '{{last_name}}' }}</code>,
+    <code>{{ '{{email}}' }}</code>, <code>{{ '{{unsubscribe_url}}' }}</code> (required), plus any custom field.</p>
+  <button type="submit" class="btn btn-primary">Save</button>
+</form>
+
+<section class="panel">
+  <div class="row-between"><h2>Live preview</h2><button type="button" class="btn btn-small" id="previewBtn">Refresh preview</button></div>
+  <div id="preview" class="preview muted">Click "Refresh preview" to render with sample data.</div>
+</section>
+
+{% block scripts %}
+<script>
+const btn = document.getElementById('previewBtn');
+btn.addEventListener('click', async () => {
+  const body = document.getElementById('body').value;
+  const type = document.getElementById('type').value;
+  const data = new URLSearchParams({ type, body });
+  const res = await fetch('/templates/preview', { method: 'POST', body: data });
+  document.getElementById('preview').innerHTML = await res.text();
+});
+</script>
+{% endblock %}
+{% endblock %}

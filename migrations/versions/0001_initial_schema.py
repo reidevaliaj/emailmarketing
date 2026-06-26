@@ -85,6 +85,7 @@ def upgrade() -> None:
     sa.Column('contact_count', sa.Integer(), nullable=False),
     sa.Column('verification_status', sa.String(length=30), nullable=False),
     sa.Column('verification_summary', sa.JSON().with_variant(postgresql.JSONB(), 'postgresql'), nullable=True),
+    sa.Column('import_summary', sa.JSON().with_variant(postgresql.JSONB(), 'postgresql'), nullable=True),
     sa.Column('free_provider_filter_applied', sa.Boolean(), nullable=False),
     sa.Column('created_at', app.models.base.TZDateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='SET NULL'),

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Sign in — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>{{ app_name }}</h1>
+  <form method="post" action="/login">
+    <label>Email
+      <input type="email" name="email" required autofocus>
+    </label>
+    <label>Password
+      <input type="password" name="password" required>
+    </label>
+    <button type="submit" class="btn btn-primary">Sign in</button>
+  </form>
+</div>
+{% endblock %}

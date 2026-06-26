@@ -29,6 +29,9 @@ class ContactList(Base):
     )
     # JSONB: {"valid": n, "invalid": n, "unknown": n, "failed_domains": [...], ...}
     verification_summary: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # JSONB: CSV import report (imported / skipped-duplicate / skipped-suppressed /
+    # skipped-free-provider / skipped-invalid / error_rows / progress).
+    import_summary: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
     # Records whether the consumer/free-provider filter was applied on import.
     free_provider_filter_applied: Mapped[bool] = mapped_column(default=True, nullable=False)

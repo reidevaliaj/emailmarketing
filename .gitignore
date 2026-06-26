@@ -40,3 +40,7 @@ redis-data/
 .idea/
 .vscode/
 .DS_Store
+
+# Celery beat schedule (local runtime)
+celerybeat-schedule*
+celerybeat.pid
