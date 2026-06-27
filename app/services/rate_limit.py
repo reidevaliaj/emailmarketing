@@ -155,6 +155,30 @@ def record_daily_send(client: "redis_lib.Redis", ip_pool: str) -> int:
     return used
 
 
+# --- global warming cap counter (total across the whole pool) --------------
+
+def _global_key() -> str:
+    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    return f"warmsent:{day}"
+
+
+def global_sent_today(client: "redis_lib.Redis") -> int:
+    try:
+        val = client.get(_global_key())
+    except redis_lib.RedisError:
+        return 0
+    return int(val) if val else 0
+
+
+def record_global_send(client: "redis_lib.Redis") -> int:
+    """Count one successful send against today's TOTAL warming cap."""
+    key = _global_key()
+    used = client.incr(key)
+    if used == 1:
+        client.expire(key, _seconds_until_midnight_utc() + 3600)
+    return used
+
+
 _sync_redis: "redis_lib.Redis | None" = None
 
 

@@ -28,14 +28,34 @@ from app.services.suppression import suppress_sync
 logger = get_logger(__name__)
 
 
+# Postal statuses that are PERMANENT (suppress). Everything else on a delivery-
+# failure event (SoftFail, Held, unknown) is a temporary DEFERRAL that Postal
+# retries — it must NOT suppress (planner spec Section 6a: deferrals are the
+# rate-limit signal during warming, not bounces).
+_PERMANENT_STATUSES = {"hardfail", "hard_fail", "permanent"}
+
+
+def is_deferral(event: PostalWebhookEvent) -> bool:
+    """A temporary failure (SoftFail/Held) — retried by Postal, never suppressed."""
+    if not event.is_failure or event.is_complaint:
+        return False
+    if event.event_type == "MessageBounced":
+        return False
+    return (event.status or "").strip().lower() not in _PERMANENT_STATUSES
+
+
 def classify_bounce(event: PostalWebhookEvent) -> bool:
     """Return True if this event should globally suppress the address.
 
-    SEAM (Section 7): default policy = suppress on ANY failure/complaint.
-    Replace this body to inspect ``event.status`` (e.g. SMTP 4.x.x vs 5.x.x)
-    for selective suppression — nothing else needs to change.
+    Owner policy is aggressive (any real bounce/complaint suppresses permanently),
+    but a DEFERRAL is not a bounce. Suppress on complaints, MessageBounced, and
+    HardFail; do NOT suppress on SoftFail / Held / temporary failures.
     """
-    return True
+    if event.is_complaint:
+        return True
+    if event.event_type == "MessageBounced":
+        return True
+    return (event.status or "").strip().lower() in _PERMANENT_STATUSES
 
 
 def _is_duplicate(session: Session, event: PostalWebhookEvent) -> bool:
@@ -79,11 +99,13 @@ def apply_event(session: Session, event: PostalWebhookEvent) -> str:
         logger.info("webhook unmatched token=%s type=%s", event.message_token, event.event_type)
         return "unmatched"
 
-    # Append to the append-only event log (dedup key = provider_event_id).
+    # Append to the append-only event log (dedup key = provider_event_id). The
+    # Postal status is stored so deferral (SoftFail) rates are queryable.
     session.add(
         EmailEvent(
             campaign_recipient_id=cr.id,
             type=event.event_type,
+            status=event.status,
             provider_event_id=event.event_uuid,
             raw_payload=event.raw,
             occurred_at=event.occurred_at,
@@ -98,6 +120,11 @@ def apply_event(session: Session, event: PostalWebhookEvent) -> str:
         return "delivered"
 
     if event.is_failure or event.is_complaint:
+        # DEFERRAL (SoftFail/Held): temporary — Postal retries. Do NOT suppress
+        # and do NOT mark bounced; just log it for rate-discovery monitoring.
+        if is_deferral(event):
+            return "deferred"
+
         already_bounced = cr.status == RecipientStatus.BOUNCED.value
         cr.status = RecipientStatus.BOUNCED.value
         if cr.error_detail is None and event.detail:
@@ -105,7 +132,7 @@ def apply_event(session: Session, event: PostalWebhookEvent) -> str:
         if not already_bounced:
             bump_campaign(session, cr.campaign_id, bounced_count=1)
 
-        # ANY failure/complaint => global, permanent suppression (owner policy).
+        # Real bounce / complaint => global, permanent suppression (owner policy).
         if classify_bounce(event):
             reason = (
                 SuppressionReason.COMPLAINT

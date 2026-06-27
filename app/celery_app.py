@@ -28,6 +28,7 @@ celery_app = Celery(
         "app.tasks.verification",
         "app.tasks.webhooks",
         "app.tasks.imports",
+        "app.tasks.planner",
     ],
 )
 
@@ -52,6 +53,10 @@ celery_app.conf.update(
         "finalize-campaigns": {
             "task": "app.tasks.scheduler.finalize_and_repump",
             "schedule": 120.0,  # every 2 minutes
+        },
+        "planner-dispatch": {
+            "task": "app.tasks.planner.run_planner",
+            "schedule": 3600.0,  # hourly; idempotent (one run per campaign per day)
         },
     },
 )

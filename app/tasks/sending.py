@@ -48,9 +48,12 @@ from app.services.rate_limit import (
     build_send_buckets,
     get_rate_limiter,
     get_redis,
+    global_sent_today,
     is_under_daily_cap,
     record_daily_send,
+    record_global_send,
 )
+from app.services.warming import current_daily_cap
 from app.services.suppression import is_suppressed_sync
 from app.services.tokens import unsubscribe_url
 
@@ -262,6 +265,9 @@ def send_one(self, campaign_recipient_id: int) -> str:
             )
             tmpl_type = template.type if template else "plain"
             tmpl_body = template.body if template else ""
+            # Warming: total daily cap across the pool + overflow policy.
+            warming_cap = current_daily_cap(session)
+            overflow_policy = get_planner_config_sync(session).get("overflow_policy", "hard_stop")
             if template is None:
                 cr.status = RecipientStatus.FAILED.value
                 cr.error_detail = "campaign has no template"
@@ -282,6 +288,23 @@ def send_one(self, campaign_recipient_id: int) -> str:
             send_one.apply_async((campaign_recipient_id,), countdown=countdown)
             logger.info("daily cap reached for pool=%s; deferring recipient %s", pool, campaign_recipient_id)
             return "daily-cap"
+
+        # Warming hard-stop: TOTAL daily cap across the pool (Section 5/6).
+        if global_sent_today(redis) >= warming_cap:
+            if overflow_policy == "defer":
+                send_one.apply_async((campaign_recipient_id,), countdown=3600)
+                return "warming-deferred"
+            with sync_session() as session:  # hard-stop: skip the remainder today
+                cr = session.get(CampaignRecipient, campaign_recipient_id)
+                if cr and cr.status == RecipientStatus.PENDING.value:
+                    cr.status = RecipientStatus.SKIPPED_CAP.value
+                    _bump(session, campaign_id, skipped_count=1)
+                    _maybe_finalize(session, campaign_id)
+            logger.warning(
+                "WARMING CAP hit (%d/day) — hard-stop, skipping recipient %s",
+                warming_cap, campaign_recipient_id,
+            )
+            return "warming-cap"
 
         # --- Phase 3: render + send --------------------------------------
         unsub = unsubscribe_url(email)
@@ -347,6 +370,7 @@ def send_one(self, campaign_recipient_id: int) -> str:
                     record_send(session, freq_campaign_id, contact_id)
                 _maybe_finalize(session, campaign_id)
         record_daily_send(redis, pool)
+        record_global_send(redis)  # warming cap counter (total across pool)
         return "sent"
     finally:
         redis.delete(lock_key)
