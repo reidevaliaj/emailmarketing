@@ -38,9 +38,12 @@ from app.models.enums import (
     RecipientStatus,
 )
 from app.models.template import Template
+from app.services.campaign_lists import campaign_list_ids_sync
 from app.services.counters import bump_campaign as _bump
+from app.services.frequency import ineligible_contact_ids, record_send
 from app.services.merge import build_context, render
 from app.services.normalize import domain_of
+from app.services.planner_config import get_planner_config_sync
 from app.services.rate_limit import (
     build_send_buckets,
     get_rate_limiter,
@@ -112,9 +115,20 @@ def materialize_campaign(campaign_id: int) -> dict:
             return {"error": "campaign not found"}
         if campaign.status != CampaignStatus.SENDING.value:
             return {"skipped": "campaign not in sending state", "status": campaign.status}
-        if campaign.list_id is None:
+
+        # Pool the campaign's lists (many-to-many; falls back to legacy list_id).
+        list_ids = campaign_list_ids_sync(session, campaign_id)
+        if not list_ids:
             campaign.status = CampaignStatus.FAILED.value
             return {"error": "campaign has no list"}
+
+        # Frequency rule (planner runs): exclude contacts who already received the
+        # RECURRING campaign (the run's parent) within the interval.
+        freq_campaign_id = campaign.parent_campaign_id
+        ineligible: set[int] = set()
+        if freq_campaign_id is not None:
+            interval = int(get_planner_config_sync(session)["frequency_interval_days"])
+            ineligible = ineligible_contact_ids(session, freq_campaign_id, interval)
 
         # Already-materialized contact ids (idempotent re-run).
         existing_ids = set(
@@ -130,54 +144,38 @@ def materialize_campaign(campaign_id: int) -> dict:
 
         rows = session.execute(
             select(
-                Contact.id,
-                Contact.email,
-                Contact.first_name,
-                Contact.last_name,
-                Contact.custom_fields,
-                Suppression.id,
+                Contact.id, Contact.email, Contact.first_name,
+                Contact.last_name, Contact.custom_fields, Suppression.id,
             )
             .outerjoin(Suppression, Suppression.email == Contact.email)
             .where(
-                Contact.list_id == campaign.list_id,
+                Contact.list_id.in_(list_ids),
                 Contact.status == ContactStatus.ACTIVE.value,
             )
         ).all()
 
-        created = skipped = 0
+        created = skipped = freq_skipped = 0
         batch = 0
         for contact_id, email, first, last, custom, supp_id in rows:
             if contact_id in existing_ids:
                 continue
-            merge_snapshot = {
-                "first_name": first,
-                "last_name": last,
-                "custom_fields": custom or {},
-            }
+            existing_ids.add(contact_id)  # de-dup across pooled lists
+            merge_snapshot = {"first_name": first, "last_name": last, "custom_fields": custom or {}}
             if supp_id is not None:
-                session.add(
-                    CampaignRecipient(
-                        campaign_id=campaign_id,
-                        contact_id=contact_id,
-                        email_snapshot=email,
-                        merge_snapshot=merge_snapshot,
-                        ip_pool=campaign.ip_pool,
-                        status=RecipientStatus.SKIPPED_SUPPRESSED.value,
-                    )
-                )
+                status = RecipientStatus.SKIPPED_SUPPRESSED.value
                 skipped += 1
+            elif contact_id in ineligible:
+                status = RecipientStatus.SKIPPED_FREQUENCY.value
+                freq_skipped += 1
             else:
-                session.add(
-                    CampaignRecipient(
-                        campaign_id=campaign_id,
-                        contact_id=contact_id,
-                        email_snapshot=email,
-                        merge_snapshot=merge_snapshot,
-                        ip_pool=campaign.ip_pool,
-                        status=RecipientStatus.PENDING.value,
-                    )
-                )
+                status = RecipientStatus.PENDING.value
                 created += 1
+            session.add(
+                CampaignRecipient(
+                    campaign_id=campaign_id, contact_id=contact_id, email_snapshot=email,
+                    merge_snapshot=merge_snapshot, ip_pool=campaign.ip_pool, status=status,
+                )
+            )
             batch += 1
             if batch % 1000 == 0:
                 session.flush()
@@ -187,22 +185,23 @@ def materialize_campaign(campaign_id: int) -> dict:
             select(func.count()).select_from(CampaignRecipient).where(
                 CampaignRecipient.campaign_id == campaign_id
             )
-        )
-        total_skipped = session.scalar(
+        ) or 0
+        pending = session.scalar(
             select(func.count()).select_from(CampaignRecipient).where(
                 CampaignRecipient.campaign_id == campaign_id,
-                CampaignRecipient.status == RecipientStatus.SKIPPED_SUPPRESSED.value,
+                CampaignRecipient.status == RecipientStatus.PENDING.value,
             )
-        )
-        campaign.total_recipients = total or 0
-        campaign.skipped_count = total_skipped or 0
-        campaign.queued_count = (total or 0) - (total_skipped or 0)
+        ) or 0
+        campaign.total_recipients = total
+        campaign.skipped_count = total - pending
+        campaign.queued_count = pending
 
     enqueue_pending_for_campaign(campaign_id)
     logger.info(
-        "materialized campaign %s: created=%d skipped_suppressed=%d", campaign_id, created, skipped
+        "materialized campaign %s: created=%d skipped_suppressed=%d skipped_frequency=%d",
+        campaign_id, created, skipped, freq_skipped,
     )
-    return {"created": created, "skipped_suppressed": skipped}
+    return {"created": created, "skipped_suppressed": skipped, "skipped_frequency": freq_skipped}
 
 
 # --- per-recipient send (Sections 6.2-6.4) --------------------------------
@@ -248,6 +247,9 @@ def send_one(self, campaign_recipient_id: int) -> str:
             # Snapshot everything needed to send, then release the DB txn before
             # the network call (never hold a transaction across HTTP I/O).
             campaign_id = campaign.id
+            # Frequency log key (planner runs record against the recurring parent).
+            freq_campaign_id = campaign.parent_campaign_id
+            contact_id = cr.contact_id
             domain = domain_of(email)
             pool = cr.ip_pool or campaign.ip_pool or "default"
             subject_tpl = campaign.subject
@@ -340,6 +342,9 @@ def send_one(self, campaign_recipient_id: int) -> str:
                 cr.postal_message_id = result.message_token
                 cr.ip_pool = pool
                 _bump(session, campaign_id, sent_count=1)
+                # Record the per-(contact, campaign) send for the frequency rule.
+                if freq_campaign_id is not None and contact_id is not None:
+                    record_send(session, freq_campaign_id, contact_id)
                 _maybe_finalize(session, campaign_id)
         record_daily_send(redis, pool)
         return "sent"
