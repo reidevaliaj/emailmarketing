@@ -9,6 +9,12 @@ from app.models.base import Base
 from app.models.campaign import Campaign, CampaignRecipient, EmailEvent
 from app.models.contact import Contact
 from app.models.contact_list import ContactList
+from app.models.planner import (
+    CampaignContactSend,
+    CampaignList,
+    IPWarmState,
+    PlannerPlacement,
+)
 from app.models.suppression import Suppression
 from app.models.template import Template
 from app.models.user import User
@@ -25,4 +31,8 @@ __all__ = [
     "EmailEvent",
     "AppSetting",
     "ApiKey",
+    "CampaignList",
+    "PlannerPlacement",
+    "CampaignContactSend",
+    "IPWarmState",
 ]

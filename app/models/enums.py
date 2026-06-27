@@ -56,6 +56,7 @@ class CampaignStatus(StrEnum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    PLANNER = "planner"          # recurring planner definition (parked; never sent directly)
 
 
 class RecipientStatus(StrEnum):
@@ -65,6 +66,8 @@ class RecipientStatus(StrEnum):
     BOUNCED = "bounced"
     FAILED = "failed"
     SKIPPED_SUPPRESSED = "skipped_suppressed"
+    SKIPPED_FREQUENCY = "skipped_frequency"   # received this campaign within the interval
+    SKIPPED_CAP = "skipped_cap"               # daily warming cap hard-stop
 
 
 # Terminal recipient states — a campaign is complete when every recipient is in
@@ -76,4 +79,6 @@ TERMINAL_RECIPIENT_STATUSES = {
     RecipientStatus.BOUNCED,
     RecipientStatus.FAILED,
     RecipientStatus.SKIPPED_SUPPRESSED,
+    RecipientStatus.SKIPPED_FREQUENCY,
+    RecipientStatus.SKIPPED_CAP,
 }

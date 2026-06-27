@@ -25,8 +25,22 @@ class Campaign(Base):
     template_id: Mapped[int | None] = mapped_column(
         ForeignKey("templates.id", ondelete="RESTRICT"), nullable=True
     )
+    # Legacy single list (kept for back-compat); the source of truth for a
+    # campaign's lists is now the campaign_lists join (a campaign pools many).
     list_id: Mapped[int | None] = mapped_column(
         ForeignKey("contact_lists.id", ondelete="RESTRICT"), nullable=True
+    )
+
+    # --- Planner / recurring fields (4-Week Planner feature) ---
+    # Local clock send time + timezone (e.g. "09:00", "Europe/Tirana"). When a
+    # planner campaign fires on its day it starts at this local time.
+    send_time: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    send_timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # True for a recurring planner DEFINITION (parked, status=planner). Each
+    # monthly firing clones it into a one-off run with parent_campaign_id set.
+    is_planner: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
+    parent_campaign_id: Mapped[int | None] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     # Stored UTC; scheduling/display tz handled at the presentation layer.
@@ -115,6 +129,9 @@ class EmailEvent(Base):
         ForeignKey("campaign_recipients.id", ondelete="CASCADE"), nullable=False, index=True
     )
     type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Postal delivery status (e.g. Sent / SoftFail / HardFail / Bounced). Stored
+    # so deferral (SoftFail) rates are queryable for warming/rate discovery.
+    status: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
     # Postal's own event id — used to dedupe redelivered webhooks (idempotency).
     provider_event_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, unique=True
