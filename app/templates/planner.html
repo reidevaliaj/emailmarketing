@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}4-Week Planner — {{ app_name }}{% endblock %}
+{% block content %}
+
+<div class="row-between">
+  <h1>4-Week Planner</h1>
+  <div>
+    <a href="/planner/status" class="btn">Status &amp; warming</a>
+    <a href="/planner/campaigns/new" class="btn btn-primary">+ New service campaign</a>
+  </div>
+</div>
+
+<div class="planner-banner">
+  <strong>This plan repeats automatically every month.</strong>
+  Set it once — the system sends every working day at each service's own time. Weekends and a 5th
+  week are idle. Current daily cap (warming): <strong>{{ "{:,}".format(grid.daily_cap) }}</strong> contacts/day.
+</div>
+
+<div class="planner-layout">
+  <!-- side panel: services to drag onto the grid -->
+  <aside class="planner-side">
+    <h2>Services</h2>
+    <p class="muted">Drag a card onto a day, or use “+ add” in a cell.</p>
+    {% if campaigns %}
+    <div class="svc-list">
+      {% for c in campaigns %}
+      <div class="svc" draggable="true" data-campaign-id="{{ c.id }}" style="--svc: {{ c.color }}">
+        <div class="svc-top">
+          <span class="svc-name">{{ c.name }}</span>
+          <a class="svc-edit" href="/planner/campaigns/{{ c.id }}/edit" title="Edit">✎</a>
+        </div>
+        <div class="svc-meta">🕘 {{ c.send_time or '09:00' }} {{ c.send_timezone or '' }}</div>
+        <div class="svc-meta">👥 {{ c.eligible }} eligible · placed in {{ c.placed }} day(s)</div>
+        {% if c.lists %}<div class="svc-meta">{{ c.lists|join(', ') }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No service campaigns yet. <a href="/planner/campaigns/new">Create one</a> to start planning.</p>
+    {% endif %}
+  </aside>
+
+  <!-- the grid -->
+  <section class="planner-main">
+    <div id="planner-grid-container">
+      {% include "_planner_grid.html" %}
+    </div>
+  </section>
+</div>
+
+<div id="add-menu" class="add-menu" hidden></div>
+<script type="application/json" id="planner-campaigns">
+  {{ campaigns | tojson }}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const Planner = (() => {
+  const campaigns = JSON.parse(document.getElementById('planner-campaigns').textContent || '[]');
+
+  async function post(url, data) {
+    const res = await fetch(url, { method: 'POST', body: new URLSearchParams(data) });
+    return res.ok ? res.json() : { ok: false };
+  }
+  async function refresh() {
+    const res = await fetch('/planner/grid');
+    if (res.ok) document.getElementById('planner-grid-container').innerHTML = await res.text();
+  }
+  async function add(campaignId, week, weekday) {
+    await post('/planner/placements', { campaign_id: campaignId, week, weekday });
+    refresh();
+  }
+  async function move(placementId, week, weekday) {
+    await post(`/planner/placements/${placementId}/move`, { week, weekday });
+    refresh();
+  }
+  async function remove(placementId) {
+    await post(`/planner/placements/${placementId}/delete`, {});
+    refresh();
+  }
+
+  // Fallback picker for cells (and accessibility).
+  function addPrompt(week, weekday) {
+    const menu = document.getElementById('add-menu');
+    if (!campaigns.length) { alert('Create a service campaign first.'); return; }
+    menu.innerHTML = '<div class="add-menu-title">Add to Week ' + week + ' ' +
+      ['Mon','Tue','Wed','Thu','Fri'][weekday] + '</div>';
+    campaigns.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'add-menu-item'; b.textContent = c.name;
+      b.style.setProperty('--svc', c.color);
+      b.onclick = () => { menu.hidden = true; add(c.id, week, weekday); };
+      menu.appendChild(b);
+    });
+    const ev = window.event;
+    menu.style.left = (ev ? ev.pageX : 200) + 'px';
+    menu.style.top = (ev ? ev.pageY : 200) + 'px';
+    menu.hidden = false;
+  }
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('add-menu');
+    if (menu && !menu.hidden && !menu.contains(e.target) && !e.target.classList.contains('pg-add'))
+      menu.hidden = true;
+  });
+
+  // Drag and drop via delegation (survives grid refresh).
+  let dragData = null;
+  document.addEventListener('dragstart', e => {
+    const svc = e.target.closest('.svc');
+    const card = e.target.closest('.pcard');
+    if (svc) dragData = { kind: 'add', campaignId: svc.dataset.campaignId };
+    else if (card) dragData = { kind: 'move', placementId: card.dataset.placementId };
+    if (dragData) e.dataTransfer.effectAllowed = 'move';
+  });
+  document.addEventListener('dragover', e => {
+    if (e.target.closest('.pg-cell')) { e.preventDefault(); e.target.closest('.pg-cell').classList.add('drop-hover'); }
+  });
+  document.addEventListener('dragleave', e => {
+    const cell = e.target.closest('.pg-cell'); if (cell) cell.classList.remove('drop-hover');
+  });
+  document.addEventListener('drop', e => {
+    const cell = e.target.closest('.pg-cell');
+    if (!cell || !dragData) return;
+    e.preventDefault(); cell.classList.remove('drop-hover');
+    const week = +cell.dataset.week, weekday = +cell.dataset.weekday;
+    if (dragData.kind === 'add') add(dragData.campaignId, week, weekday);
+    else if (dragData.kind === 'move') move(dragData.placementId, week, weekday);
+    dragData = null;
+  });
+
+  return { add, move, remove, addPrompt };
+})();
+</script>
+{% endblock %}

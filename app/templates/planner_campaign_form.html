@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if campaign else 'New' }} service campaign — {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/planner">&larr; Planner</a></p>
+<h1>{{ 'Edit service campaign' if campaign else 'New service campaign' }}</h1>
+<p class="muted">A recurring campaign = one template + one or more lists + a send time. Place it on the
+planner grid and it sends automatically every month at its position.</p>
+
+<form method="post" action="{{ ('/planner/campaigns/' ~ campaign.id) if campaign else '/planner/campaigns' }}">
+  <label>Service name <span class="muted">(e.g. “Website Dev offer”, “AI Receptionist”)</span>
+    <input type="text" name="name" required value="{{ campaign.name if campaign else '' }}">
+  </label>
+  <label>Subject<input type="text" name="subject" value="{{ campaign.subject if campaign else '' }}"></label>
+
+  <div class="two-col">
+    <label>From name<input type="text" name="from_name" value="{{ campaign.from_name if campaign else settings.default_from_name }}"></label>
+    <label>From email<input type="email" name="from_email" value="{{ campaign.from_email if campaign else settings.default_from_email }}"></label>
+  </div>
+  <label>Reply-To <span class="muted">(optional — replies go here, any domain)</span>
+    <input type="email" name="reply_to" value="{{ (campaign.reply_to or '') if campaign else settings.default_reply_to }}">
+  </label>
+
+  <label>Template
+    <select name="template_id" required>
+      <option value="">— choose —</option>
+      {% for t in templates %}
+      <option value="{{ t.id }}" {{ 'selected' if campaign and campaign.template_id == t.id }}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <fieldset class="lists-field">
+    <legend>Lists <span class="muted">(pooled &amp; de-duplicated; pick one or more)</span></legend>
+    {% if lists %}
+    <div class="checkbox-grid">
+      {% for l in lists %}
+      <label class="checkbox">
+        <input type="checkbox" name="list_ids" value="{{ l.id }}" {{ 'checked' if l.id in selected_lists }}>
+        {{ l.name }} <span class="muted">({{ l.contact_count }})</span>
+      </label>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No lists yet — <a href="/lists">upload one</a> first.</p>
+    {% endif %}
+  </fieldset>
+
+  <div class="two-col">
+    <label>Send time <span class="muted">(local clock)</span>
+      <input type="time" name="send_time" value="{{ campaign.send_time if campaign else '09:00' }}">
+    </label>
+    <label>Timezone
+      <input type="text" name="send_timezone" list="tzlist"
+             value="{{ campaign.send_timezone if campaign else 'Europe/Tirana' }}">
+      <datalist id="tzlist">{% for tz in timezones %}<option value="{{ tz }}">{% endfor %}</datalist>
+    </label>
+  </div>
+  <label>IP pool (optional)<input type="text" name="ip_pool" value="{{ campaign.ip_pool or '' if campaign else '' }}" placeholder="default"></label>
+
+  <button type="submit" class="btn btn-primary">{{ 'Save' if campaign else 'Create service' }}</button>
+</form>
+
+{% if campaign %}
+<form method="post" action="/planner/campaigns/{{ campaign.id }}/delete" style="margin-top:1rem"
+      onsubmit="return confirm('Delete this service campaign and remove it from the planner?');">
+  <button class="btn btn-danger">Delete service</button>
+</form>
+{% endif %}
+{% endblock %}

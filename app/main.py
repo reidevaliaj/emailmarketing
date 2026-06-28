@@ -25,6 +25,7 @@ from app.web import auth as auth_web
 from app.web import campaigns as campaigns_web
 from app.web import dashboard as dashboard_web
 from app.web import lists as lists_web
+from app.web import planner as planner_web
 from app.web import settings_routes as settings_web
 from app.web import templates_routes as templates_web
 
@@ -75,6 +76,7 @@ app.include_router(dashboard_web.router)
 app.include_router(lists_web.router)
 app.include_router(templates_web.router)
 app.include_router(campaigns_web.router)
+app.include_router(planner_web.router)
 app.include_router(settings_web.router)
 app.include_router(status_api.router)
 app.include_router(webhooks_api.router)

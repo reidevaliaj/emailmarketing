@@ -1,0 +1,48 @@
+{# 4-week x 5-day grid. Returned standalone for drag/drop refresh. #}
+<div class="planner-grid">
+  <div class="pg-head">
+    <div class="pg-corner">Week ↓ / Day →</div>
+    {% for wd in grid.weekdays %}
+    <div class="pg-dayhead">
+      <span>{{ wd }}</span>
+      <span class="pg-daytotal {{ 'over' if grid.day_totals[loop.index0] > grid.daily_cap }}"
+            title="Total contacts sending this weekday across all 4 weeks">
+        {{ grid.day_totals[loop.index0] }}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% for week_row in grid.matrix %}
+  <div class="pg-row">
+    <div class="pg-weeklabel">Week {{ loop.index }}</div>
+    {% for cell in week_row %}
+    <div class="pg-cell {{ 'is-empty' if not cell.cards }} {{ 'over-cap' if cell.total > grid.daily_cap and cell.total > 0 }}"
+         data-week="{{ cell.week }}" data-weekday="{{ cell.weekday }}">
+      {% for card in cell.cards %}
+      <div class="pcard" draggable="true"
+           data-placement-id="{{ card.placement_id }}" data-campaign-id="{{ card.campaign_id }}"
+           style="--svc: {{ card.color }}">
+        <div class="pcard-top">
+          <span class="pcard-name">{{ card.name }}</span>
+          <button class="pcard-x" title="Remove from this day"
+                  onclick="Planner.remove({{ card.placement_id }})">&times;</button>
+        </div>
+        <div class="pcard-meta">{{ card.template_name or '—' }}{% if card.list_names %} · {{ card.list_names|join(', ') }}{% endif %}</div>
+        <div class="pcard-meta">🕘 {{ card.send_time or '09:00' }} {{ card.send_timezone or '' }} · 👥 {{ card.eligible }}</div>
+      </div>
+      {% endfor %}
+
+      {% if not cell.cards %}
+      <div class="pg-emptyhint">Drop a service here</div>
+      {% endif %}
+      <button class="pg-add" onclick="Planner.addPrompt({{ cell.week }}, {{ cell.weekday }})">+ add</button>
+      {% if cell.total > 0 %}
+      <div class="pg-celltotal {{ 'over' if cell.total > grid.daily_cap }}"
+           title="{{ cell.total }} contacts would send on this day">{{ cell.total }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>

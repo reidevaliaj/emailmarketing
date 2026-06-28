@@ -92,10 +92,11 @@ def _per_minute_bucket(key: str, per_minute: int) -> Bucket:
     return Bucket(key=key, capacity=float(per_minute), refill_per_sec=per_minute / 60.0)
 
 
-def build_send_buckets(domain: str) -> list[Bucket]:
-    """Global + per-recipient-domain buckets from configured rates."""
+def build_send_buckets(domain: str, global_per_minute: int | None = None) -> list[Bucket]:
+    """Global + per-recipient-domain buckets. ``global_per_minute`` (from the
+    editable planner config) overrides the env default when provided."""
     return [
-        _per_minute_bucket("rl:global", settings.rate_global_per_minute),
+        _per_minute_bucket("rl:global", global_per_minute or settings.rate_global_per_minute),
         _per_minute_bucket(f"rl:dom:{domain}", settings.rate_per_domain_per_minute),
     ]
 

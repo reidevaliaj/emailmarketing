@@ -265,9 +265,11 @@ def send_one(self, campaign_recipient_id: int) -> str:
             )
             tmpl_type = template.type if template else "plain"
             tmpl_body = template.body if template else ""
-            # Warming: total daily cap across the pool + overflow policy.
+            # Warming: total daily cap + pacing + overflow policy (editable config).
             warming_cap = current_daily_cap(session)
-            overflow_policy = get_planner_config_sync(session).get("overflow_policy", "hard_stop")
+            _cfg = get_planner_config_sync(session)
+            overflow_policy = _cfg.get("overflow_policy", "hard_stop")
+            send_rate = int(_cfg.get("send_rate_per_minute") or 25)
             if template is None:
                 cr.status = RecipientStatus.FAILED.value
                 cr.error_detail = "campaign has no template"
@@ -276,7 +278,7 @@ def send_one(self, campaign_recipient_id: int) -> str:
                 return "no-template"
 
         # --- Phase 2: pacing (does NOT consume retry budget) --------------
-        rate = get_rate_limiter().acquire(build_send_buckets(domain))
+        rate = get_rate_limiter().acquire(build_send_buckets(domain, send_rate))
         if not rate.allowed:
             countdown = min(max(1, math.ceil(rate.retry_after)), 60)
             send_one.apply_async((campaign_recipient_id,), countdown=countdown)

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Planner status — {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/planner">&larr; Planner</a></p>
+<h1>Planner status &amp; warming</h1>
+
+<!-- Warming + rate signal -->
+<div class="cards">
+  <div class="card"><div class="card-num">{{ "{:,}".format(monitor.warming.total_daily_cap) }}</div><div class="card-label">Daily cap (total)</div></div>
+  <div class="card"><div class="card-num">{{ "{:,}".format(monitor.deferrals.sent_today) }}</div><div class="card-label">Sent today</div></div>
+  <div class="card {% if monitor.deferrals.deferral_rate_pct >= 5 %}card-warn{% endif %}">
+    <div class="card-num">{{ monitor.deferrals.deferral_rate_pct }}%</div><div class="card-label">Deferral rate</div></div>
+  <div class="card"><div class="card-num">{{ monitor.deferrals.deferred_today }}</div><div class="card-label">Deferred today</div></div>
+  <div class="card {% if monitor.low_inventory_count %}card-warn{% endif %}">
+    <div class="card-num">{{ monitor.low_inventory_count }}</div><div class="card-label">Low-inventory services</div></div>
+</div>
+<p class="muted">Deferrals (4xx / SoftFail) are the rate-limit signal, not bounces — Postal retries them and
+they never suppress. A rising deferral rate means you're approaching the provider's pacing wall: slow the
+per-minute rate. A provider warning email or a port-25 block instead means hold the daily volume.</p>
+
+<!-- Per-IP warming -->
+<section class="panel">
+  <h2>IP warming</h2>
+  <table>
+    <thead><tr><th>IP</th><th>Pool</th><th>Warming since</th><th>Week</th><th>Daily cap</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+      {% for ip in monitor.warming.ips %}
+      <tr>
+        <td class="mono">{{ ip.ip }}</td><td>{{ ip.pool or '—' }}</td>
+        <td>{{ ip.age_days }}d ago</td><td>{{ ip.week }}</td><td>{{ "{:,}".format(ip.daily_cap) }}</td>
+        <td>{{ 'yes' if ip.active else 'no' }}</td>
+        <td><form method="post" action="/planner/warming/ip/{{ ip.ip }}/delete" style="display:inline"><button class="btn btn-small btn-danger">Remove</button></form></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">No IPs registered — using a single conservative ramp. Add your sending IP(s) below.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form method="post" action="/planner/warming/ip" class="inline-form" style="margin-top:.6rem">
+    <input type="text" name="ip" placeholder="89.117.49.213" required>
+    <input type="text" name="pool" placeholder="pool (optional)">
+    <input type="date" name="warmed_since" title="Date warming started">
+    <button class="btn">Set warming start</button>
+  </form>
+</section>
+
+<!-- Per-campaign status -->
+<section>
+  <h2>Service campaigns</h2>
+  <table>
+    <thead><tr><th>Service</th><th>Lists</th><th>Active / Eligible now</th><th>Last fired</th><th>Reached</th><th>Inventory</th></tr></thead>
+    <tbody>
+      {% for c in monitor.campaigns %}
+      <tr>
+        <td><span style="color:{{ c.color }}">●</span> <a href="/planner/campaigns/{{ c.id }}/edit">{{ c.name }}</a></td>
+        <td class="muted">{{ c.lists|join(', ') or '—' }}</td>
+        <td>{{ "{:,}".format(c.total_contacts) }} / <strong>{{ "{:,}".format(c.eligible) }}</strong></td>
+        <td>{{ c.last_fired.strftime('%Y-%m-%d') if c.last_fired else 'never' }}</td>
+        <td>{{ c.last_reached }}</td>
+        <td>{% if c.low_inventory %}<span class="badge badge-bounced">add fresh lists</span>{% else %}<span class="badge badge-active">ok</span>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No service campaigns yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<!-- Editable policy -->
+<section class="panel">
+  <h2>Warming &amp; pacing settings</h2>
+  <form method="post" action="/planner/config">
+    <label>Warming ramp — daily cap per week (total across the pool)</label>
+    <div class="two-col">
+      <label>Week 1<input type="number" name="ramp1" value="{{ cfg.warming_ramp[0] }}"></label>
+      <label>Week 2<input type="number" name="ramp2" value="{{ cfg.warming_ramp[1] }}"></label>
+    </div>
+    <div class="two-col">
+      <label>Week 3<input type="number" name="ramp3" value="{{ cfg.warming_ramp[2] }}"></label>
+      <label>Week 4<input type="number" name="ramp4" value="{{ cfg.warming_ramp[3] }}"></label>
+    </div>
+    <div class="two-col">
+      <label>Full volume (after week 4)<input type="number" name="warming_full" value="{{ cfg.warming_full }}"></label>
+      <label>Send rate (per minute)<input type="number" name="send_rate_per_minute" value="{{ cfg.send_rate_per_minute }}"></label>
+    </div>
+    <div class="two-col">
+      <label>Frequency interval (days)<input type="number" name="frequency_interval_days" value="{{ cfg.frequency_interval_days }}"></label>
+      <label>Overflow policy
+        <select name="overflow_policy">
+          <option value="hard_stop" {{ 'selected' if cfg.overflow_policy == 'hard_stop' }}>Hard stop (skip remainder)</option>
+          <option value="defer" {{ 'selected' if cfg.overflow_policy == 'defer' }}>Defer to next day</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn btn-primary">Save settings</button>
+  </form>
+  <p class="muted">These take effect live (the worker reads them at send time). Push the daily cap and
+  per-minute rate up gradually, watching the deferral rate above — back off when it climbs.</p>
+</section>
+{% endblock %}
