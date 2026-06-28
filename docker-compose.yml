@@ -39,6 +39,7 @@ services:
   # waits for this to finish successfully.
   migrate:
     build: .
+    image: emailmarketing-app:latest
     command: sh -c "alembic upgrade head && python -m scripts.seed_admin"
     env_file: .env
     depends_on:
@@ -48,6 +49,7 @@ services:
 
   app:
     build: .
+    image: emailmarketing-app:latest
     restart: unless-stopped
     env_file: .env
     volumes:
@@ -62,6 +64,7 @@ services:
 
   worker:
     build: .
+    image: emailmarketing-app:latest
     restart: unless-stopped
     command: sh -c "celery -A app.celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-4}"
     env_file: .env
@@ -75,6 +78,7 @@ services:
 
   beat:
     build: .
+    image: emailmarketing-app:latest
     restart: unless-stopped
     command: celery -A app.celery_app.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     env_file: .env
