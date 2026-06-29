@@ -128,6 +128,10 @@ async def add_placement(
 ):
     pid = await planner_svc.add_placement(session, campaign_id, week, weekday)
     await session.commit()
+    # If this cell is today's position, create the run now (don't wait for beat).
+    from app.tasks.planner import run_planner
+
+    run_planner.delay()
     return JSONResponse({"ok": pid is not None, "placement_id": pid})
 
 
@@ -141,6 +145,9 @@ async def move_placement(
 ):
     ok = await planner_svc.move_placement(session, placement_id, week, weekday)
     await session.commit()
+    from app.tasks.planner import run_planner
+
+    run_planner.delay()
     return JSONResponse({"ok": ok})
 
 

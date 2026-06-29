@@ -12,6 +12,7 @@ Redis is the broker and result backend. Key settings for correct, paced sending:
 from __future__ import annotations
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.config import settings
 from app.logging import configure_logging
@@ -56,7 +57,9 @@ celery_app.conf.update(
         },
         "planner-dispatch": {
             "task": "app.tasks.planner.run_planner",
-            "schedule": 3600.0,  # hourly; idempotent (one run per campaign per day)
+            # Every 5 min on the wall clock so a campaign's send time is honoured
+            # promptly. Idempotent (at most one run per campaign per day).
+            "schedule": crontab(minute="*/5"),
         },
     },
 )
